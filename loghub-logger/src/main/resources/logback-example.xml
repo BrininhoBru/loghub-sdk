@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Example logback.xml configuration for LogHub Logger.
+    Copy this file to your application's src/main/resources/ directory
+    and customize the values according to your environment.
+-->
+<configuration>
+
+    <!-- Console appender for local development -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- LogHub HTTP Appender for sending logs to LogHub API -->
+    <appender name="LOGHUB" class="io.loghub.logger.appender.HttpLogAppender">
+        <!-- Required: LogHub API endpoint -->
+        <endpoint>http://localhost:8080/api/v1/logs</endpoint>
+
+        <!-- Required: Application name for log identification -->
+        <application>my-application</application>
+
+        <!-- Required: Environment (e.g., development, staging, production) -->
+        <environment>development</environment>
+
+        <!-- Optional: HTTP request timeout in milliseconds (default: 5000) -->
+        <timeoutMs>5000</timeoutMs>
+
+        <!-- Optional: Internal queue capacity (default: 1000) -->
+        <queueCapacity>1000</queueCapacity>
+
+        <!-- Optional: Number of worker threads for sending logs (default: 1) -->
+        <workerThreads>1</workerThreads>
+
+        <!-- Optional: Minimum log level to send (default: INFO) -->
+        <!-- Options: TRACE, DEBUG, INFO, WARN, ERROR -->
+        <minimumLevel>INFO</minimumLevel>
+
+        <!-- Optional: Enable/disable the appender (default: true) -->
+        <enabled>true</enabled>
+    </appender>
+
+    <!-- Root logger configuration -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOGHUB"/>
+    </root>
+
+    <!-- Example: Reduce logging for noisy libraries -->
+    <logger name="org.apache.http" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+
+</configuration>
+
