@@ -99,15 +99,15 @@ public final class LogEventConverter {
      */
     private Map<String, Object> extractMetadata(ILoggingEvent loggingEvent) {
         Map<String, String> mdcMap = loggingEvent.getMDCPropertyMap();
-        if (mdcMap == null || mdcMap.isEmpty()) {
-            return null;
-        }
-
         Map<String, Object> metadata = new HashMap<>();
-        for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-            // Skip traceId as it has its own field
-            if (!TRACE_ID_KEY.equals(entry.getKey())) {
-                metadata.put(entry.getKey(), entry.getValue());
+
+        // Add MDC entries (excluding traceId)
+        if (mdcMap != null && !mdcMap.isEmpty()) {
+            for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
+                // Skip traceId as it has its own field
+                if (!TRACE_ID_KEY.equals(entry.getKey())) {
+                    metadata.put(entry.getKey(), entry.getValue());
+                }
             }
         }
 
@@ -117,10 +117,8 @@ public final class LogEventConverter {
             metadata.put("exception.message", loggingEvent.getThrowableProxy().getMessage());
         }
 
-        // Add logger name
+        // Always add logger name and thread name
         metadata.put("logger", loggingEvent.getLoggerName());
-
-        // Add thread name
         metadata.put("thread", loggingEvent.getThreadName());
 
         return metadata.isEmpty() ? null : metadata;

@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
  * HTTP client for sending log events to the LogHub API.
  * Uses Java's native HttpClient for async communication.
  */
-public final class LogHubHttpClient {
+public class LogHubHttpClient {
 
     private static final String CONTENT_TYPE_JSON = "application/json";
 
