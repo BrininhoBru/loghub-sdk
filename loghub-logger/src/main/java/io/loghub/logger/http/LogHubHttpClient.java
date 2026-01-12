@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.loghub.contract.LogEvent;
+import io.loghub.logger.config.LogHubConfig;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -24,6 +25,7 @@ public class LogHubHttpClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final String endpoint;
+    private final String apiKey;
     private final Duration timeout;
 
     /**
@@ -33,8 +35,20 @@ public class LogHubHttpClient {
      * @param timeoutMs the request timeout in milliseconds
      */
     public LogHubHttpClient(String endpoint, int timeoutMs) {
+        this(endpoint, timeoutMs, null);
+    }
+
+    /**
+     * Creates a new HTTP client with API Key authentication.
+     *
+     * @param endpoint  the LogHub API endpoint URL
+     * @param timeoutMs the request timeout in milliseconds
+     * @param apiKey    the API key for authentication (can be null)
+     */
+    public LogHubHttpClient(String endpoint, int timeoutMs, String apiKey) {
         this.endpoint = endpoint;
         this.timeout = Duration.ofMillis(timeoutMs);
+        this.apiKey = apiKey;
 
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(timeout)
@@ -55,10 +69,17 @@ public class LogHubHttpClient {
         try {
             String json = objectMapper.writeValueAsString(logEvent);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
                     .timeout(timeout)
-                    .header("Content-Type", CONTENT_TYPE_JSON)
+                    .header("Content-Type", CONTENT_TYPE_JSON);
+
+            // Add API Key header if configured
+            if (apiKey != null && !apiKey.isBlank()) {
+                requestBuilder.header(LogHubConfig.API_KEY_HEADER, apiKey);
+            }
+
+            HttpRequest request = requestBuilder
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
 

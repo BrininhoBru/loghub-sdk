@@ -8,9 +8,15 @@ public final class LogHubConfig {
 
     private static final LogHubConfig INSTANCE = new LogHubConfig();
 
+    /**
+     * Header name for API Key authentication.
+     */
+    public static final String API_KEY_HEADER = "X-API-KEY";
+
     private String application = "unknown";
     private String environment = "unknown";
     private String endpoint;
+    private String apiKey;
     private int timeoutMs = 5000;
     private int queueCapacity = 1000;
     private int workerThreads = 1;
@@ -52,6 +58,14 @@ public final class LogHubConfig {
         this.endpoint = endpoint;
     }
 
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
     public int getTimeoutMs() {
         return timeoutMs;
     }
@@ -90,11 +104,22 @@ public final class LogHubConfig {
                "application='" + application + '\'' +
                ", environment='" + environment + '\'' +
                ", endpoint='" + endpoint + '\'' +
+               ", apiKey='" + maskApiKey(apiKey) + '\'' +
                ", timeoutMs=" + timeoutMs +
                ", queueCapacity=" + queueCapacity +
                ", workerThreads=" + workerThreads +
                ", enabled=" + enabled +
                '}';
+    }
+
+    /**
+     * Masks the API key for secure logging (shows only first 4 chars).
+     */
+    private String maskApiKey(String key) {
+        if (key == null || key.length() <= 4) {
+            return "****";
+        }
+        return key.substring(0, 4) + "****";
     }
 }
 

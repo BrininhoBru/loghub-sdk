@@ -32,25 +32,27 @@ class HttpLogAppenderTest {
     }
 
     @Test
-    void shouldNotStartWithoutEndpoint() {
+    void shouldStartButNotProcessWithoutEndpoint() {
         appender.setApplication("test-app");
         appender.setEnvironment("test");
         // No endpoint set
 
         appender.start();
 
-        assertFalse(appender.isStarted());
+        // Should start (to not block Spring Boot) but won't process logs
+        assertTrue(appender.isStarted());
     }
 
     @Test
-    void shouldNotStartWhenDisabled() {
+    void shouldStartButNotProcessWhenDisabled() {
         appender.setEndpoint("http://localhost:8080/logs");
         appender.setApplication("test-app");
         appender.setEnabled(false);
 
         appender.start();
 
-        assertFalse(appender.isStarted());
+        // Should start (to not block Spring Boot) but won't process logs
+        assertTrue(appender.isStarted());
     }
 
     @Test
@@ -78,6 +80,7 @@ class HttpLogAppenderTest {
         appender.setEndpoint("http://custom.endpoint/logs");
         appender.setApplication("custom-app");
         appender.setEnvironment("custom-env");
+        appender.setApiKey("test-api-key-12345");
         appender.setTimeoutMs(10000);
         appender.setQueueCapacity(500);
         appender.setMinimumLevel("WARN");
@@ -86,10 +89,51 @@ class HttpLogAppenderTest {
         assertEquals("http://custom.endpoint/logs", appender.getEndpoint());
         assertEquals("custom-app", appender.getApplication());
         assertEquals("custom-env", appender.getEnvironment());
+        assertEquals("test****", appender.getApiKey()); // Should be masked
         assertEquals(10000, appender.getTimeoutMs());
         assertEquals(500, appender.getQueueCapacity());
         assertEquals("WARN", appender.getMinimumLevel());
         assertEquals(2, appender.getWorkerThreads());
+    }
+
+    @Test
+    void shouldMaskApiKeyInGetter() {
+        appender.setApiKey("my-secret-api-key");
+
+        String maskedKey = appender.getApiKey();
+
+        assertEquals("my-s****", maskedKey);
+        assertFalse(maskedKey.contains("secret"));
+    }
+
+    @Test
+    void shouldHandleShortApiKey() {
+        appender.setApiKey("abc");
+
+        String maskedKey = appender.getApiKey();
+
+        assertEquals("****", maskedKey);
+    }
+
+    @Test
+    void shouldHandleNullApiKey() {
+        // API key not set
+        String maskedKey = appender.getApiKey();
+
+        assertEquals("****", maskedKey);
+    }
+
+    @Test
+    void shouldStartWithApiKeyConfigured() {
+        appender.setEndpoint("http://localhost:8080/api/logs");
+        appender.setApplication("test-app");
+        appender.setEnvironment("test");
+        appender.setApiKey("test-api-key");
+        appender.setEnabled(true);
+
+        appender.start();
+
+        assertTrue(appender.isStarted());
     }
 
     @Test

@@ -16,7 +16,7 @@ class LogEventTest {
     void shouldCreateWithBuilder() {
         Instant now = Instant.now();
         SdkInfo sdk = new SdkInfo("java", "1.0.0");
-        Map<String, Object> metadata = Map.of("key", "value");
+        Map<String, String> metadata = Map.of("key", "value");
 
         LogEvent event = LogEvent.builder()
                 .application("test-app")

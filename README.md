@@ -25,6 +25,8 @@ loghub-sdk/
         │   └── HttpLogAppender.java    # Appender customizado do Logback
         ├── config/
         │   └── LogHubConfig.java       # Configurações do SDK
+        ├── context/
+        │   └── LogContext.java         # Contexto para dados extras (objetos, payloads)
         ├── converter/
         │   └── LogEventConverter.java  # Conversor de eventos
         ├── http/
@@ -32,7 +34,8 @@ loghub-sdk/
         ├── queue/
         │   └── LogEventQueue.java      # Fila assíncrona
         └── util/
-            └── SdkVersion.java         # Utilitário de versão
+            ├── SdkVersion.java         # Utilitário de versão
+            └── SensitiveDataMasker.java # Mascaramento de dados sensíveis
 ```
 
 ## 🔹 Módulos
@@ -193,13 +196,16 @@ Crie ou edite o arquivo `src/main/resources/logback.xml`:
     <!-- LogHub HTTP Appender -->
     <appender name="LOGHUB" class="io.loghub.logger.appender.HttpLogAppender">
         <!-- Obrigatório: Endpoint da API LogHub -->
-        <endpoint>http://api.loghub.io/v1/logs</endpoint>
+        <endpoint>http://api.loghub.io/api/logs</endpoint>
         
         <!-- Obrigatório: Nome da aplicação -->
         <application>minha-aplicacao</application>
         
         <!-- Obrigatório: Ambiente -->
         <environment>production</environment>
+        
+        <!-- API Key para autenticação (ver seção abaixo) -->
+        <apiKey>${LOGHUB_API_KEY:-}</apiKey>
         
         <!-- Opcional: Timeout em ms (padrão: 5000) -->
         <timeoutMs>5000</timeoutMs>
@@ -221,6 +227,65 @@ Crie ou edite o arquivo `src/main/resources/logback.xml`:
 
 </configuration>
 ```
+
+### 🔐 Configuração da API Key
+
+O LogHub SDK requer uma API Key para autenticar as requisições. A API Key é enviada no header `X-API-KEY`.
+
+#### Ordem de Resolução
+
+O SDK busca a API Key nas seguintes fontes (em ordem de prioridade):
+
+| Prioridade | Fonte | Exemplo |
+|------------|-------|---------|
+| 1️⃣ | Configuração no `logback.xml` | `<apiKey>minha-api-key</apiKey>` |
+| 2️⃣ | System Property | `-Dloghub.api.key=minha-api-key` |
+| 3️⃣ | Variável de Ambiente | `LOGHUB_API_KEY=minha-api-key` |
+
+#### Configuração por Ambiente
+
+| Ambiente | Recomendação |
+|----------|--------------|
+| **Desenvolvimento** | Configurar diretamente no `logback.xml` ou usar `loghub-dev-key-2024` |
+| **Testes** | Usar System Property: `-Dloghub.api.key=test-api-key` |
+| **Produção** | **Sempre usar variável de ambiente** para não expor a chave |
+
+#### Exemplos de Configuração
+
+**Desenvolvimento (logback.xml):**
+```xml
+<apiKey>loghub-dev-key-2024</apiKey>
+```
+
+**Produção (variável de ambiente):**
+```bash
+# Linux/macOS
+export LOGHUB_API_KEY=sua-api-key-producao
+
+# Windows PowerShell
+$env:LOGHUB_API_KEY = "sua-api-key-producao"
+
+# Docker
+docker run -e LOGHUB_API_KEY=sua-api-key-producao minha-app
+```
+
+**Spring Boot com variável de ambiente no logback.xml:**
+```xml
+<!-- Usa variável de ambiente, com fallback para dev -->
+<apiKey>${LOGHUB_API_KEY:-loghub-dev-key-2024}</apiKey>
+```
+
+**Via JVM arguments:**
+```bash
+java -Dloghub.api.key=minha-api-key -jar minha-app.jar
+```
+
+#### Respostas de Erro
+
+| Código HTTP | Descrição |
+|-------------|-----------|
+| `401` | API Key ausente ou inválida |
+| `403` | API Key não tem permissão para este recurso |
 
 ### 3. Usar o Logger Normalmente
 
@@ -257,7 +322,192 @@ public class MinhaClasse {
             MDC.clear();
         }
     }
+```
+
+### 4. Adicionar Dados Extras ao Metadata (LogContext)
+
+Use o `LogContext` para adicionar dados extras que serão incluídos no metadata do log:
+
+```java
+import io.loghub.logger.context.LogContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class OrderService {
+    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
+
+    public void processOrder(Order order, User user) {
+        try {
+            // Adicionar valores ao contexto
+            LogContext.put("orderId", order.getId());
+            LogContext.put("userId", user.getId());
+            LogContext.put("orderTotal", String.valueOf(order.getTotal()));
+            LogContext.put("region", "south");
+            LogContext.put("priority", "high");
+            
+            // Adicionar múltiplos valores de uma vez
+            LogContext.putAll(Map.of(
+                "channel", "web",
+                "version", "2.0"
+            ));
+            
+            logger.info("Processando pedido");
+            // O log incluirá todos os dados do LogContext no metadata
+            
+            processPayment(order);
+            logger.info("Pagamento processado com sucesso");
+            
+        } catch (Exception e) {
+            // Exceções também são capturadas no metadata
+            logger.error("Erro ao processar pedido", e);
+            throw e;
+        } finally {
+            // IMPORTANTE: Sempre limpar o contexto
+            LogContext.clear();
+        }
+    }
 }
+```
+
+#### Exemplo de JSON enviado para a API:
+
+```json
+{
+  "application": "order-service",
+  "environment": "production",
+  "level": "INFO",
+  "message": "Processando pedido",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "traceId": "abc-123-xyz",
+  "metadata": {
+    "logger": "com.example.OrderService",
+    "thread": "http-nio-8080-exec-1",
+    "orderId": "ORD-001",
+    "userId": "USR-123",
+    "orderTotal": "150.99",
+    "region": "south",
+    "priority": "high",
+    "channel": "web",
+    "version": "2.0"
+  },
+  "sdk": {
+    "language": "java",
+    "version": "0.1.0"
+  }
+}
+```
+
+#### Uso com Filtros (Web Applications):
+
+```java
+import io.loghub.logger.context.LogContext;
+import javax.servlet.*;
+
+public class LogContextFilter implements Filter {
+    
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, 
+                         FilterChain chain) throws IOException, ServletException {
+        try {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            
+            // Adicionar contexto da requisição
+            LogContext.put("requestId", UUID.randomUUID().toString());
+            LogContext.put("clientIp", request.getRemoteAddr());
+            LogContext.put("method", httpRequest.getMethod());
+            LogContext.put("path", httpRequest.getRequestURI());
+            LogContext.put("userAgent", httpRequest.getHeader("User-Agent"));
+            
+            chain.doFilter(request, response);
+            
+        } finally {
+            // Limpar contexto ao final da requisição
+            LogContext.removeContext();
+        }
+    }
+}
+```
+
+#### Métodos Disponíveis no LogContext:
+
+| Método | Descrição |
+|--------|-----------|
+| `put(key, value)` | Adiciona String, Number ou Boolean (convertido para String) |
+| `putAll(map)` | Adiciona todos os valores de um Map |
+| `get(key)` | Obtém um valor |
+| `remove(key)` | Remove um valor |
+| `getAll()` | Retorna todos os valores |
+| `isEmpty()` | Verifica se está vazio |
+| `clear()` | Limpa todos os valores |
+| `removeContext()` | Remove o contexto do thread (para thread pools) |
+
+## 🔒 Mascaramento de Dados Sensíveis
+
+O SDK mascara automaticamente dados sensíveis em mensagens de log e metadados para prevenir vazamento de informações confidenciais.
+
+### Dados Mascarados Automaticamente
+
+| Tipo | Exemplo Original | Exemplo Mascarado |
+|------|------------------|-------------------|
+| Email | `john@example.com` | `j***@***.com` |
+| Cartão de Crédito | `4111-1111-1111-1111` | `*********1111` |
+| CPF | `123.456.789-09` | `***.***.***-09` |
+| CNPJ | `12.345.678/0001-95` | `***.***/***-95` |
+| Telefone | `(11) 98765-4321` | `(***) ***-4321` |
+
+### Campos Sensíveis (Mascarados por Nome)
+
+Os seguintes campos são automaticamente mascarados no metadata:
+
+- `password`, `senha`, `pwd`, `pass`
+- `token`, `accessToken`, `refreshToken`
+- `apiKey`, `api_key`, `secret`
+- `authorization`, `bearer`, `credential`
+- `cpf`, `cnpj`, `ssn`, `rg`
+- `cardNumber`, `creditCard`, `cvv`, `cvc`, `pin`
+- `privateKey`, `publicKey`, `certificate`
+
+### Exemplos
+
+```java
+// Email no log será mascarado automaticamente
+logger.info("Usuário john@example.com criado");
+// Enviado como: "Usuário j***@***.com criado"
+
+// Campo 'password' no metadata será mascarado
+LogContext.put("password", "minhasenha123");
+// Enviado como: "mi******23"
+
+// CPF na mensagem será mascarado
+logger.info("CPF do cliente: 123.456.789-09");
+// Enviado como: "CPF do cliente: ***.***.***-09"
+```
+
+### Adicionar Campos Sensíveis Personalizados
+
+```java
+import io.loghub.logger.util.SensitiveDataMasker;
+
+// Adicionar um campo personalizado como sensível
+SensitiveDataMasker.addSensitiveField("meuCampoSecreto");
+
+// Remover um campo da lista de sensíveis (não recomendado)
+SensitiveDataMasker.removeSensitiveField("email");
+```
+
+### Usar o Mascarador Manualmente
+
+```java
+import io.loghub.logger.util.SensitiveDataMasker;
+
+// Mascarar padrões sensíveis em um texto
+String masked = SensitiveDataMasker.mask("Email: john@test.com, CPF: 123.456.789-09");
+
+// Verificar se um campo é sensível
+boolean isSensitive = SensitiveDataMasker.isSensitiveField("password"); // true
+
+// Mascarar valor se o campo for sensível
+String value = SensitiveDataMasker.maskIfSensitive("apiKey", "sk-1234567890");
 ```
 
 ## ⚙️ Configurações do Appender

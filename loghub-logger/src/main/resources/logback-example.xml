@@ -16,13 +16,25 @@
     <!-- LogHub HTTP Appender for sending logs to LogHub API -->
     <appender name="LOGHUB" class="io.loghub.logger.appender.HttpLogAppender">
         <!-- Required: LogHub API endpoint -->
-        <endpoint>http://localhost:8080/api/v1/logs</endpoint>
+        <endpoint>http://localhost:8080/api/logs</endpoint>
 
         <!-- Required: Application name for log identification -->
         <application>my-application</application>
 
         <!-- Required: Environment (e.g., development, staging, production) -->
         <environment>development</environment>
+
+        <!--
+            API Key for authentication (X-API-KEY header).
+            Resolution order (first found wins):
+            1. Value configured here in logback.xml
+            2. System property: -Dloghub.api.key=your-key
+            3. Environment variable: LOGHUB_API_KEY
+
+            For production, prefer environment variable to avoid exposing the key:
+            export LOGHUB_API_KEY=your-production-api-key
+        -->
+        <apiKey>${LOGHUB_API_KEY:-loghub-dev-key-2024}</apiKey>
 
         <!-- Optional: HTTP request timeout in milliseconds (default: 5000) -->
         <timeoutMs>5000</timeoutMs>

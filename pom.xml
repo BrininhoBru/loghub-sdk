@@ -26,7 +26,7 @@
         <!-- Dependency versions -->
         <jackson.version>2.16.1</jackson.version>
         <slf4j.version>2.0.11</slf4j.version>
-        <logback.version>1.4.14</logback.version>
+        <logback.version>1.5.16</logback.version>
         <junit.version>5.10.1</junit.version>
     </properties>
 

@@ -18,18 +18,31 @@ import io.loghub.logger.queue.LogEventQueue;
  *   <li>Sends logs asynchronously to avoid blocking the application</li>
  *   <li>Never throws exceptions that could impact the application</li>
  *   <li>Enriches logs with application metadata</li>
+ *   <li>Supports API Key authentication via X-API-KEY header</li>
  * </ul>
  *
  * <p>Configuration example in logback.xml:
  * <pre>{@code
  * <appender name="LOGHUB" class="io.loghub.logger.appender.HttpLogAppender">
- *     <endpoint>http://api.loghub.io/logs</endpoint>
+ *     <endpoint>http://api.loghub.io/api/logs</endpoint>
  *     <application>my-service</application>
  *     <environment>production</environment>
+ *     <apiKey>your-api-key</apiKey>
  *     <timeoutMs>5000</timeoutMs>
  *     <queueCapacity>1000</queueCapacity>
+ *     <minimumLevel>INFO</minimumLevel>
  * </appender>
  * }</pre>
+ *
+ * <p>API Key Resolution (in order of priority):
+ * <ol>
+ *   <li>Explicitly configured via {@code <apiKey>} in logback.xml</li>
+ *   <li>System property: {@code -Dloghub.api.key=your-key}</li>
+ *   <li>Environment variable: {@code LOGHUB_API_KEY}</li>
+ * </ol>
+ *
+ * <p>For production environments, it's recommended to use environment variables
+ * to avoid exposing the API key in configuration files.
  */
 public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
 
@@ -37,6 +50,7 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
     private String endpoint;
     private String application = "unknown";
     private String environment = "unknown";
+    private String apiKey;
     private int timeoutMs = 5000;
     private int queueCapacity = 1000;
     private int workerThreads = 1;
@@ -53,27 +67,36 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
     public void start() {
         if (!enabled) {
             addInfo("LogHub appender is disabled");
+            super.start(); // Mark as started even when disabled to avoid errors
             return;
         }
 
         if (endpoint == null || endpoint.isBlank()) {
             addError("LogHub endpoint is required but not configured");
+            // Still mark as started to prevent Spring Boot startup failure
+            super.start();
             return;
         }
 
         try {
+            addInfo("Initializing LogHub appender with endpoint: " + endpoint);
+
+            // Resolve API Key from configuration or environment variable
+            String resolvedApiKey = resolveApiKey();
+
             // Initialize configuration
             config = LogHubConfig.getInstance();
             config.setApplication(application);
             config.setEnvironment(environment);
             config.setEndpoint(endpoint);
+            config.setApiKey(resolvedApiKey);
             config.setTimeoutMs(timeoutMs);
             config.setQueueCapacity(queueCapacity);
             config.setWorkerThreads(workerThreads);
             config.setEnabled(enabled);
 
-            // Initialize components
-            httpClient = new LogHubHttpClient(endpoint, timeoutMs);
+            // Initialize components with API Key
+            httpClient = new LogHubHttpClient(endpoint, timeoutMs, resolvedApiKey);
             eventQueue = new LogEventQueue(httpClient, queueCapacity, workerThreads);
             converter = new LogEventConverter(config);
 
@@ -81,11 +104,13 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
             eventQueue.start();
 
             super.start();
-            addInfo("LogHub appender started - endpoint: " + endpoint);
+            addInfo("LogHub appender started successfully - endpoint: " + endpoint);
 
         } catch (Exception e) {
-            addError("Failed to start LogHub appender", e);
-            // Don't throw - appender should fail silently
+            addError("Failed to start LogHub appender: " + e.getMessage(), e);
+            // Mark as started anyway to prevent blocking application startup
+            // The appender will simply not send logs if initialization failed
+            super.start();
         }
     }
 
@@ -108,6 +133,11 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
     @Override
     protected void append(ILoggingEvent eventObject) {
         if (!isStarted() || !enabled) {
+            return;
+        }
+
+        // Check if components were initialized successfully
+        if (converter == null || eventQueue == null) {
             return;
         }
 
@@ -140,6 +170,39 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
         return level.isGreaterOrEqual(minimumLevel);
     }
 
+    /**
+     * Resolves the API Key from multiple sources in order of priority:
+     * 1. Explicitly configured in logback.xml
+     * 2. System property: loghub.api.key
+     * 3. Environment variable: LOGHUB_API_KEY
+     *
+     * @return the resolved API key, or null if not configured
+     */
+    private String resolveApiKey() {
+        // Priority 1: Explicitly configured
+        if (apiKey != null && !apiKey.isBlank()) {
+            addInfo("Using API Key from logback.xml configuration");
+            return apiKey;
+        }
+
+        // Priority 2: System property
+        String systemPropKey = System.getProperty("loghub.api.key");
+        if (systemPropKey != null && !systemPropKey.isBlank()) {
+            addInfo("Using API Key from system property 'loghub.api.key'");
+            return systemPropKey;
+        }
+
+        // Priority 3: Environment variable
+        String envKey = System.getenv("LOGHUB_API_KEY");
+        if (envKey != null && !envKey.isBlank()) {
+            addInfo("Using API Key from environment variable 'LOGHUB_API_KEY'");
+            return envKey;
+        }
+
+        addWarn("No API Key configured. Requests to LogHub API may fail with 401 Unauthorized.");
+        return null;
+    }
+
     // ========== Configuration Setters (called by Logback) ==========
 
     public void setEndpoint(String endpoint) {
@@ -152,6 +215,10 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
 
     public void setEnvironment(String environment) {
         this.environment = environment;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
 
     public void setTimeoutMs(int timeoutMs) {
@@ -186,6 +253,14 @@ public class HttpLogAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
 
     public String getEnvironment() {
         return environment;
+    }
+
+    public String getApiKey() {
+        // Return masked for security
+        if (apiKey == null || apiKey.length() <= 4) {
+            return "****";
+        }
+        return apiKey.substring(0, 4) + "****";
     }
 
     public int getTimeoutMs() {

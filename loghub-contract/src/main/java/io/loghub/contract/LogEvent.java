@@ -21,13 +21,18 @@ import java.util.Objects;
  *   "message": "string",
  *   "timestamp": "ISO-8601 UTC",
  *   "traceId": "string (optional)",
- *   "metadata": "object (optional)",
+ *   "metadata": {
+ *     "key": "value",
+ *     "...": "other key-value pairs"
+ *   },
  *   "sdk": {
  *     "language": "string",
  *     "version": "string"
  *   }
  * }
  * }</pre>
+ *
+ * <p>The metadata field is a simple key-value map for additional context.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class LogEvent {
@@ -52,7 +57,7 @@ public final class LogEvent {
     private final String traceId;
 
     @JsonProperty("metadata")
-    private final Map<String, Object> metadata;
+    private final Map<String, String> metadata;
 
     @JsonProperty("sdk")
     private final SdkInfo sdk;
@@ -76,7 +81,7 @@ public final class LogEvent {
      */
     private LogEvent(String application, String environment, LogLevel level,
                      String message, Instant timestamp, String traceId,
-                     Map<String, Object> metadata, SdkInfo sdk) {
+                     Map<String, String> metadata, SdkInfo sdk) {
         this.application = application;
         this.environment = environment;
         this.level = level;
@@ -142,11 +147,11 @@ public final class LogEvent {
     }
 
     /**
-     * Gets additional metadata as key-value pairs (optional).
+     * Gets additional metadata as simple key-value pairs (optional).
      *
      * @return the metadata map, or null if not present
      */
-    public Map<String, Object> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
@@ -213,7 +218,7 @@ public final class LogEvent {
         private String message;
         private Instant timestamp;
         private String traceId;
-        private Map<String, Object> metadata;
+        private Map<String, String> metadata;
         private SdkInfo sdk;
 
         private Builder() {
@@ -249,7 +254,7 @@ public final class LogEvent {
             return this;
         }
 
-        public Builder metadata(Map<String, Object> metadata) {
+        public Builder metadata(Map<String, String> metadata) {
             this.metadata = metadata;
             return this;
         }
