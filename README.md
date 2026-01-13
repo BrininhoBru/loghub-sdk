@@ -1,10 +1,68 @@
 # LogHub SDK
 
-[![Java Version](https://img.shields.io/badge/Java-17+-blue.svg)](https://openjdk.org/projects/jdk/17/)
-[![Maven](https://img.shields.io/badge/Maven-3.8+-orange.svg)](https://maven.apache.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-17+-blue.svg?style=flat-square" alt="Java Version">
+  <img src="https://img.shields.io/badge/Maven-3.8+-orange.svg?style=flat-square" alt="Maven">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome">
+  <img src="https://img.shields.io/badge/contributions-welcome-orange.svg?style=flat-square" alt="Contributions">
+</p>
+
+<p align="center">
+  <b>Uma biblioteca open source para logging estruturado em Java</b>
+</p>
+
+---
 
 **LogHub SDK** é um monorepo Maven multi-módulo para logging estruturado em Java. Ele fornece uma biblioteca reutilizável para capturar e enviar logs para uma API central de forma assíncrona e não-bloqueante.
+
+## 🌟 Por que usar o LogHub SDK?
+
+- **🚀 Fácil integração** - Configuração simples via `logback.xml`
+- **⚡ Alta performance** - Envio assíncrono e não-bloqueante
+- **🔒 Seguro** - Mascaramento automático de dados sensíveis
+- **📦 Leve** - Sem dependências pesadas como Spring ou frameworks reativos
+- **🛡️ Fail-safe** - Nunca impacta sua aplicação, mesmo em caso de falhas
+- **📊 Estruturado** - Logs em JSON prontos para análise
+
+## 📖 Índice
+
+- [Quick Start](#-quick-start)
+- [Estrutura do Monorepo](#-estrutura-do-monorepo)
+- [Módulos](#-módulos)
+- [Como Usar](#-como-usar)
+- [Configurações do Appender](#%EF%B8%8F-configurações-do-appender)
+- [Mascaramento de Dados Sensíveis](#-mascaramento-de-dados-sensíveis)
+- [Build](#%EF%B8%8F-build)
+- [Ecossistema LogHub](#-ecossistema-loghub)
+- [Licença](#-licença)
+- [Contribuindo](#-contribuindo)
+
+## ⚡ Quick Start
+
+```xml
+<!-- Adicione ao seu pom.xml -->
+<dependency>
+    <groupId>io.loghub</groupId>
+    <artifactId>loghub-logger</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+```xml
+<!-- Configure no logback.xml -->
+<appender name="LOGHUB" class="io.loghub.logger.appender.HttpLogAppender">
+    <endpoint>http://api.loghub.io/api/logs</endpoint>
+    <application>minha-app</application>
+    <environment>production</environment>
+</appender>
+```
+
+```java
+// Use normalmente com SLF4J
+Logger logger = LoggerFactory.getLogger(MinhaClasse.class);
+logger.info("Log estruturado pronto!");
+```
 
 ## 📁 Estrutura do Monorepo
 
@@ -605,17 +663,80 @@ Este SDK foi projetado para ser leve e focado:
 - ❌ Não cria dashboard
 - ❌ Não cria API backend
 
+## 🌐 Ecossistema LogHub
+
+O LogHub SDK faz parte de um ecossistema completo para gerenciamento de logs. Conheça os outros projetos:
+
+| Projeto | Descrição | Link |
+|---------|-----------|------|
+| **LogHub API** | Backend RESTful para coleta, armazenamento e consulta de logs | [loghub-api](https://github.com/BrininhoBru/loghub-api) |
+| **LogHub SDK** | SDK para integração fácil das suas aplicações com o LogHub | Este repositório |
+| **LogHub UI** | Interface web para visualização e diagnóstico de logs | [loghub-ui](https://github.com/BrininhoBru/loghub-ui) |
+
+### Arquitetura
+
+```mermaid
+flowchart LR
+    subgraph Apps["🖥️ Suas Aplicações"]
+        A1[App 1 + SDK]
+        A2[App 2 + SDK]
+        A3[App N + SDK]
+    end
+
+    subgraph Backend["⚙️ LogHub API"]
+        API[REST API]
+        DB[(Database)]
+        API --> DB
+    end
+
+    subgraph Frontend["🌐 LogHub UI"]
+        UI[Interface Web]
+    end
+
+    A1 -->|logs| API
+    A2 -->|logs| API
+    A3 -->|logs| API
+    UI -->|consulta| API
+```
+
+### Como funciona
+
+1. **Suas aplicações** usam o **LogHub SDK** para enviar logs estruturados
+2. Os logs são enviados via HTTP para a **LogHub API**
+3. A API armazena e indexa os logs no banco de dados
+4. Você visualiza e analisa os logs através da **LogHub UI**
+
 ## 📝 Licença
 
-Apache License 2.0 - veja [LICENSE](LICENSE) para detalhes.
+Este projeto está licenciado sob a **MIT License** - uma licença permissiva que permite uso comercial, modificação, distribuição e uso privado. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
 ## 🤝 Contribuindo
 
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças seguindo o padrão [Gitmoji](https://gitmoji.dev/)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
+Contribuições são muito bem-vindas! 🎉
+
+### Como contribuir
+
+1. **Fork** o repositório
+2. **Clone** seu fork: `git clone https://github.com/seu-usuario/loghub-sdk.git`
+3. **Crie uma branch** para sua feature: `git checkout -b feature/nova-feature`
+4. **Faça suas alterações** e adicione testes
+5. **Commit** suas mudanças seguindo o padrão [Gitmoji](https://gitmoji.dev/)
+6. **Push** para a branch: `git push origin feature/nova-feature`
+7. Abra um **Pull Request**
+
+### Diretrizes
+
+- Siga as convenções de código existentes
+- Adicione testes para novas funcionalidades
+- Atualize a documentação quando necessário
+- Seja respeitoso nas discussões
+
+### Tipos de contribuição
+
+- 🐛 **Reportar bugs** - Encontrou um problema? Abra uma [issue](https://github.com/loghub/loghub-sdk/issues)
+- 💡 **Sugerir features** - Tem uma ideia? Compartilhe em uma [issue](https://github.com/loghub/loghub-sdk/issues)
+- 📝 **Melhorar documentação** - Ajude outros desenvolvedores
+- 🔧 **Enviar PRs** - Correções e melhorias são sempre bem-vindas
 
 ### 📝 Padrão de Commits
 
@@ -649,4 +770,19 @@ git commit -m "🔒 Adiciona validação de SSL/TLS"
 | ⬇️ | `:arrow_down:` | Downgrade de dependência |
 
 Veja a lista completa em [gitmoji.dev](https://gitmoji.dev/)
+
+## 🙏 Agradecimentos
+
+Obrigado a todos os [contribuidores](https://github.com/loghub/loghub-sdk/graphs/contributors) que ajudam a tornar este projeto melhor!
+
+## 📧 Contato
+
+- **Issues**: [GitHub Issues](https://github.com/loghub/loghub-sdk/issues)
+- **Discussões**: [GitHub Discussions](https://github.com/loghub/loghub-sdk/discussions)
+
+---
+
+<p align="center">
+  Feito com ❤️ pela comunidade open source
+</p>
 
